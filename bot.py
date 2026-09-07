@@ -25,14 +25,17 @@ data = {
 request = urllib.request.Request(
     url,
     data=json.dumps(data).encode("utf-8"),
-    headers={"Content-Type": "application/json"}
+    headers={"Content-Type": "application/json"},
+    method="POST"
 )
 
 try:
     response = urllib.request.urlopen(request)
-    print(response.read().decode())
+    result = response.read().decode("utf-8")
+    print(result)
 
 except urllib.error.HTTPError as e:
-    print("TELEGRAM ERROR:")
-    print(e.read().decode())
+    error_message = e.read().decode("utf-8")
+    print("Telegram Error:")
+    print(error_message)
     raise
