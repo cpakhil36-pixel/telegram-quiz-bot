@@ -19,7 +19,7 @@ data = {
     ],
     "type": "quiz",
     "correct_option_id": 1,
-    "is_anonymous": False
+   "is_anonymous": True
 }
 
 request = urllib.request.Request(
