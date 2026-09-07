@@ -1,0 +1,20 @@
+name: Akhil Quiz Schedule
+
+on:
+  schedule:
+    - cron: "10 19 7 9 *"
+
+jobs:
+  send-quiz:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout files
+        uses: actions/checkout@v4
+
+      - name: Send Quiz
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+          FILE_NAME: SSC_sample_10_questions.csv
+        run: python bot.py
