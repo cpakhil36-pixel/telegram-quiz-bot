@@ -1,6 +1,7 @@
 import os
 import json
 import urllib.request
+import urllib.error
 
 TOKEN = os.environ["BOT_TOKEN"]
 CHAT_ID = os.environ["CHAT_ID"]
@@ -27,6 +28,11 @@ request = urllib.request.Request(
     headers={"Content-Type": "application/json"}
 )
 
-response = urllib.request.urlopen(request)
+try:
+    response = urllib.request.urlopen(request)
+    print(response.read().decode())
 
-print(response.read().decode())
+except urllib.error.HTTPError as e:
+    print("TELEGRAM ERROR:")
+    print(e.read().decode())
+    raise
