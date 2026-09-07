@@ -6,7 +6,10 @@ import urllib.error
 
 TOKEN = os.environ["BOT_TOKEN"]
 CHAT_ID = os.environ["CHAT_ID"]
-FILE_NAME = os.environ.get("FILE_NAME", "SSC_sample_10_questions.csv")
+FILE_NAME = os.environ.get(
+    "FILE_NAME",
+    "SSC_sample_10_questions.csv"
+)
 
 url = f"https://api.telegram.org/bot{TOKEN}/sendPoll"
 
@@ -49,6 +52,8 @@ with open(FILE_NAME, "r", encoding="utf-8-sig") as file:
         try:
             with urllib.request.urlopen(request) as response:
                 print(response.read().decode("utf-8"))
+
         except urllib.error.HTTPError as e:
             print("Telegram Error:")
-            print(e.
+            print(e.read().decode("utf-8"))
+            raise
