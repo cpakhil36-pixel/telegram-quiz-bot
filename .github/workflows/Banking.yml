@@ -1,0 +1,61 @@
+name: Banking Daily Schedule
+
+on:
+  schedule:
+    # 9:40 AM IST - SSC Quiz
+    - cron: "10 4 8 9 *"
+
+    # 10:15 AM IST - Rank List
+    - cron: "45 4 8 9 *"
+
+    # 10:30 AM IST - Entertainment
+    - cron: "0 5 8 9 *"
+
+  workflow_dispatch:
+
+jobs:
+
+  send-quiz:
+    if: github.event.schedule == '10 4 8 9 *'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Send SSC Quiz
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.BANKING_CHAT_ID  }}
+          FILE_NAME: SSC_sample_10_questions.csv
+        run: python bot.py
+
+
+  rank-list:
+    if: github.event.schedule == '45 4 8 9 *'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Send Rank List
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.SSC_CHAT_ID }}
+        run: python rank_list.py
+
+
+  entertainment:
+    if: github.event.schedule == '0 5 8 9 *'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Send Entertainment
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.SSC_CHAT_ID }}
+        run: python entertainment.py
