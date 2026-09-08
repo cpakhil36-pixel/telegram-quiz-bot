@@ -1,8 +1,7 @@
 name: Akhil Quiz Schedule
 
 on:
-  schedule:
-    - cron: "10 19 7 9 *"
+ workflow_dispatch:
 
 jobs:
   send-quiz:
