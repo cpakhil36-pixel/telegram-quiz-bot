@@ -1,4 +1,3 @@
-name: Daily Quiz Bot
 
 on:
   schedule:
