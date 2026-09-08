@@ -3,21 +3,33 @@ import csv
 import json
 import time
 import urllib.request
+import urllib.error
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-TOKEN = os.environ["BOT_TOKEN"]
-CHAT_ID = os.environ["CHAT_ID"]
+# ==========================================
+# SETTINGS
+# ==========================================
 
-FILE_NAME = os.environ.get(
-    "FILE_NAME",
-    "SSC_sample_10_questions.csv"
-)
+TOKEN = os.environ["BOT_TOKEN"]
+CHAT_ID = os.environ["BANKING_CHAT_ID"]
+
+FILE_NAME = "SSC_sample_10_questions.csv"
 
 API = f"https://api.telegram.org/bot{TOKEN}"
 
+RANK_HOUR = 11
+RANK_MINUTE = 0
+
+india = ZoneInfo("Asia/Kolkata")
+
+
+# ==========================================
+# TELEGRAM API
+# ==========================================
 
 def telegram(method, data=None):
+
     if data is None:
         data = {}
 
@@ -26,24 +38,48 @@ def telegram(method, data=None):
     request = urllib.request.Request(
         url,
         data=json.dumps(data).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
+        headers={
+            "Content-Type": "application/json"
+        },
         method="POST"
     )
 
-    with urllib.request.urlopen(request) as response:
-        return json.loads(response.read().decode("utf-8"))
+    try:
+
+        with urllib.request.urlopen(request) as response:
+
+            return json.loads(
+                response.read().decode("utf-8")
+            )
+
+    except urllib.error.HTTPError as e:
+
+        print("Telegram Error:")
+        print(e.read().decode("utf-8"))
+
+        raise
 
 
-# =========================
-# 1. READ QUESTIONS
-# =========================
+# ==========================================
+# 1. READ CSV
+# ==========================================
 
 questions = []
 
-with open(FILE_NAME, "r", encoding="utf-8-sig") as file:
+with open(
+    FILE_NAME,
+    "r",
+    encoding="utf-8-sig"
+) as file:
+
     reader = csv.DictReader(file)
 
-    for row in reader:
+    for number, row in enumerate(
+        reader,
+        start=1
+    ):
+
+        question = row["question"].strip()
 
         options = [
             row["option1"].strip(),
@@ -55,73 +91,119 @@ with open(FILE_NAME, "r", encoding="utf-8-sig") as file:
         correct_answer = row["answer"].strip()
 
         if correct_answer not in options:
+
             raise ValueError(
-                f"Correct answer not found: {row['question']}"
+                f"Correct answer not found "
+                f"in Question {number}: "
+                f"{question}"
             )
 
         questions.append({
-            "question": row["question"].strip(),
+            "question": question,
             "options": options,
-            "correct_option_id": options.index(correct_answer)
+            "correct_option_id": options.index(
+                correct_answer
+            )
         })
 
 
-# =========================
-# 2. SEND ALL QUIZZES
-# =========================
+print(
+    f"Loaded {len(questions)} questions."
+)
+
+
+# ==========================================
+# 2. SEND QUIZZES
+# ==========================================
 
 polls = {}
 
-for number, q in enumerate(questions, start=1):
+for number, q in enumerate(
+    questions,
+    start=1
+):
+
+    print(
+        f"Sending Question {number}..."
+    )
 
     result = telegram(
         "sendPoll",
         {
             "chat_id": CHAT_ID,
-            "question": q["question"],
-            "options": q["options"],
-            "type": "quiz",
-            "correct_option_id": q["correct_option_id"],
-            "is_anonymous": False
+
+            "question":
+                q["question"],
+
+            "options":
+                q["options"],
+
+            "type":
+                "quiz",
+
+            "correct_option_id":
+                q["correct_option_id"],
+
+            # Participant name required
+            "is_anonymous":
+                False
         }
     )
 
-    if result.get("ok"):
+    if not result.get("ok"):
 
-        poll_id = result["result"]["poll"]["id"]
+        raise Exception(
+            f"Quiz failed: {result}"
+        )
 
-        polls[poll_id] = {
-            "number": number,
-            "correct": q["correct_option_id"]
-        }
+    poll_id = (
+        result["result"]["poll"]["id"]
+    )
 
-        print(f"Question {number} sent.")
+    polls[poll_id] = {
+        "question_number": number,
+        "correct_option":
+            q["correct_option_id"]
+    }
 
-    else:
-        print("Quiz error:", result)
+    print(
+        f"Question {number} sent successfully."
+    )
 
     time.sleep(5)
 
 
-# =========================
+print(
+    "All questions sent."
+)
+
+
+# ==========================================
 # 3. COLLECT ANSWERS
-# =========================
+# ==========================================
 
 scores = {}
 
-print("Waiting for answers...")
-
 offset = None
 
-# India time
-india = ZoneInfo("Asia/Kolkata")
+print(
+    "Waiting for participants' answers..."
+)
+
 
 while True:
 
     now = datetime.now(india)
 
-    # 10:50 AM reached
-    if now.hour == 10 and now.minute >= 50:
+    # Stop at 11:00 AM IST
+    if (
+        now.hour > RANK_HOUR
+        or
+        (
+            now.hour == RANK_HOUR
+            and now.minute >= RANK_MINUTE
+        )
+    ):
         break
 
     params = {
@@ -131,53 +213,110 @@ while True:
     if offset is not None:
         params["offset"] = offset
 
-    result = telegram("getUpdates", params)
+    result = telegram(
+        "getUpdates",
+        params
+    )
 
     if not result.get("ok"):
+        time.sleep(2)
         continue
 
-    for update in result.get("result", []):
+    for update in result.get(
+        "result",
+        []
+    ):
 
-        offset = update["update_id"] + 1
+        offset = (
+            update["update_id"] + 1
+        )
 
-        answer = update.get("poll_answer")
+        answer = update.get(
+            "poll_answer"
+        )
 
         if not answer:
             continue
 
-        poll_id = answer.get("poll_id")
+        poll_id = answer.get(
+            "poll_id"
+        )
 
         if poll_id not in polls:
             continue
 
-        user = answer.get("user", {})
+        user = answer.get(
+            "user",
+            {}
+        )
 
-        user_id = user.get("id")
+        user_id = user.get(
+            "id"
+        )
 
-        first_name = user.get("first_name", "")
-        last_name = user.get("last_name", "")
+        first_name = user.get(
+            "first_name",
+            ""
+        )
 
-        name = f"{first_name} {last_name}".strip()
+        last_name = user.get(
+            "last_name",
+            ""
+        )
+
+        name = (
+            f"{first_name} {last_name}"
+        ).strip()
 
         if user_id not in scores:
+
             scores[user_id] = {
                 "name": name,
-                "score": 0
+                "score": 0,
+                "answered": set()
             }
 
-        selected = answer.get("option_ids", [])
+        # Avoid counting the same question twice
+        question_number = polls[
+            poll_id
+        ]["question_number"]
 
-        correct_option = polls[poll_id]["correct"]
+        if question_number in scores[
+            user_id
+        ]["answered"]:
+            continue
 
-        if selected and selected[0] == correct_option:
-            scores[user_id]["score"] += 1
+        scores[
+            user_id
+        ]["answered"].add(
+            question_number
+        )
+
+        selected = answer.get(
+            "option_ids",
+            []
+        )
+
+        correct_option = polls[
+            poll_id
+        ]["correct_option"]
+
+        if (
+            selected
+            and
+            selected[0] == correct_option
+        ):
+
+            scores[
+                user_id
+            ]["score"] += 1
 
     time.sleep(1)
 
 
-# =========================
-# 4. CREATE RANK LIST
-# =========================
+# ==========================================
+# 4. CREATE RANKING
+# ==========================================
 
 ranking = sorted(
     scores.values(),
@@ -186,34 +325,50 @@ ranking = sorted(
 )
 
 
-# =========================
-# 5. SEND RANK LIST
-# =========================
+# ==========================================
+# 5. RANK LIST MESSAGE
+# ==========================================
 
-message = "🏆 DAILY QUIZ RANK LIST 🏆\n\n"
+message = (
+    "🏆 DAILY QUIZ RANK LIST 🏆\n\n"
+)
 
 if not ranking:
 
-    message += "No participants."
+    message += (
+        "No participants found."
+    )
 
 else:
 
-    for rank, person in enumerate(ranking, start=1):
+    for rank, person in enumerate(
+        ranking,
+        start=1
+    ):
 
         if rank == 1:
             medal = "🥇"
+
         elif rank == 2:
             medal = "🥈"
+
         elif rank == 3:
             medal = "🥉"
+
         else:
             medal = f"{rank}."
 
         message += (
-            f"{medal} {person['name']} — "
-            f"{person['score']}/{len(questions)}\n"
+            f"{medal} "
+            f"{person['name']} — "
+            f"{person['score']}/"
+            f"{len(questions)}\n"
         )
 
+
+# ==========================================
+# 6. SEND RANK LIST
+# ==========================================
 
 telegram(
     "sendMessage",
@@ -223,4 +378,7 @@ telegram(
     }
 )
 
-print("🏆 Rank List sent at 10:50 AM.")
+
+print(
+    "🏆 Rank List sent at 11:00 AM IST."
+)
