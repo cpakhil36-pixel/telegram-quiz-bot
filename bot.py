@@ -4,7 +4,7 @@ import json
 import urllib.request
 import urllib.error
 
-TOKEN = os.environ["BOT_TOKEN"]
+TOKEN = os.environ["SSC_CHAT_ID"]
 CHAT_ID = os.environ["CHAT_ID"]
 FILE_NAME = os.environ.get(
     "FILE_NAME",
