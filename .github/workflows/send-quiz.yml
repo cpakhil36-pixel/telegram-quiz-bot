@@ -1,4 +1,4 @@
-name: Send Test Quiz
+name: SSC Quiz Test
 
 on:
   workflow_dispatch:
@@ -11,8 +11,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Send quiz
+      - name: Send SSC Quiz
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-          CHAT_ID: ${{ secrets.CHAT_ID }}
+          CHAT_ID: ${{ secrets.SSC_CHAT_ID }}
+          FILE_NAME: SSC_sample_10_questions.csv
         run: python bot.py
