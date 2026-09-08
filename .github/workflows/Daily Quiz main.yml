@@ -24,4 +24,6 @@ jobs:
       - name: Run Exam Bot
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          SSC_CHAT_ID: ${{ secrets.SSC_CHAT_ID }}
+          BANKING_CHAT_ID: ${{ secrets.BANKING_CHAT_ID }}
         run: python bot.py
