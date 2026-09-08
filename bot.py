@@ -159,11 +159,11 @@ print(
 
 
 # ==========================================
-# 3. WAIT UNTIL 11:00 AM IST
+# 3. WAIT UNTIL 12:00 PM IST
 # ==========================================
 
 print(
-    "Waiting for 11:00 AM IST..."
+    "Waiting for 12:00 PM IST..."
 )
 
 while True:
@@ -203,5 +203,5 @@ telegram(
 
 
 print(
-    "🏆 Rank List message sent at 11:00 AM IST."
+    "🏆 Rank List message sent at 12.00 PM IST."
 )
