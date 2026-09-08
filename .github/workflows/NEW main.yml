@@ -1,5 +1,4 @@
-name: NEW AKHIL 
-Daily
+name: NEW AKHIL Daily
 
 on:
   workflow_dispatch:
