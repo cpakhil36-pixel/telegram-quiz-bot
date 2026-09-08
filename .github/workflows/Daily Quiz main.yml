@@ -24,6 +24,6 @@ jobs:
       - name: Run Quiz Bot
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-          RRB_SSC_CHAT_ID: ${{ secrets.RRB_SSC_CHAT_ID }}
+          RRB_SSC_CHAT_ID: ${{ secrets.SSC_CHAT_ID }}
           BANKING_CHAT_ID: ${{ secrets.BANKING_CHAT_ID }}
         run: python bot.py
