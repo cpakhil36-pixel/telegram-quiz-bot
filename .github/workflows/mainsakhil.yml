@@ -14,6 +14,6 @@ jobs:
       - name: Run Quiz Bot
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-          CHAT_ID: ${{ secrets.BANKING_CHAT_ID }}
+      CHAT_ID: ${{ secrets.CHAT_ID }}
           FILE_NAME: SSC_sample_10_questions.csv
         run: python bot.py
