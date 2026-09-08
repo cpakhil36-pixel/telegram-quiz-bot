@@ -1,13 +1,22 @@
 import os
 import csv
-import json
 import time
-import requests
+import uuid
+
+from telegram import (
+    Update,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup
+)
+
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    CallbackQueryHandler,
+    ContextTypes
+)
 
 BOT_TOKEN = os.environ["BOT_TOKEN"]
-
-SSC_CHAT_ID = os.environ["SSC_CHAT_ID"]
-BANKING_CHAT_ID = os.environ["BANKING_CHAT_ID"]
 
 SSC_FILE = "SSC.csv"
 BANKING_FILE = "BANKING.csv"
@@ -15,36 +24,16 @@ BANKING_FILE = "BANKING.csv"
 QUESTION_TIME = 60
 TOTAL_QUESTIONS = 10
 
-API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
-
-# Telegram update offset
-UPDATE_OFFSET = None
-
-
-def telegram(method, data=None):
-    try:
-        response = requests.post(
-            f"{API_URL}/{method}",
-            data=data or {},
-            timeout=30
-        )
-
-        result = response.json()
-
-        if not result.get("ok"):
-            print("Telegram Error:", result)
-
-        return result
-
-    except Exception as e:
-        print("Telegram Request Error:", e)
-        return None
-
 
 def load_questions(filename):
     questions = []
 
-    with open(filename, "r", encoding="utf-8-sig") as file:
+    with open(
+        filename,
+        "r",
+        encoding="utf-8-sig"
+    ) as file:
+
         reader = csv.DictReader(file)
 
         for row in reader:
@@ -59,421 +48,296 @@ def load_questions(filename):
                 "answer": row["answer"].strip()
             })
 
-    if len(questions) < TOTAL_QUESTIONS:
-        raise ValueError(
-            f"{filename} must contain at least "
-            f"{TOTAL_QUESTIONS} questions."
-        )
-
     return questions[:TOTAL_QUESTIONS]
 
 
-def get_correct_option(question):
-    answer = question["answer"].strip()
+def correct_answer(question):
+    answer = question["answer"].strip().upper()
 
-    answer_map = {
-        "A": 0,
-        "B": 1,
-        "C": 2,
-        "D": 3
-    }
+    if answer in ["A", "B", "C", "D"]:
+        return ord(answer) - ord("A")
 
-    if answer.upper() in answer_map:
-        return answer_map[answer.upper()]
+    for i, option in enumerate(
+        question["options"]
+    ):
+        if option.lower() == question[
+            "answer"
+        ].strip().lower():
+            return i
 
-    for index, option in enumerate(question["options"]):
-        if option.lower() == answer.lower():
-            return index
+    return 0
 
-    raise ValueError(
-        f"Answer not found in options: {answer}"
+
+SSC_QUESTIONS = load_questions(
+    SSC_FILE
+)
+
+BANKING_QUESTIONS = load_questions(
+    BANKING_FILE
+)
+
+sessions = {}
+
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                "📝 SSC + RRB Exam",
+                callback_data="start_ssc"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "🏦 Banking Exam",
+                callback_data="start_banking"
+            )
+        ]
+    ]
+
+    await update.message.reply_text(
+        "🎓 DAILY ONLINE EXAM\n\n"
+        "Choose your exam:",
+        reply_markup=InlineKeyboardMarkup(
+            keyboard
+        )
     )
 
 
-def send_question(chat_id, number, question):
-    correct_option = get_correct_option(question)
+async def start_exam(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
 
-    data = {
-        "chat_id": chat_id,
+    query = update.callback_query
 
-        "question": (
-            f"Question {number}/{TOTAL_QUESTIONS}\n\n"
-            f"{question['question']}"
-        ),
+    await query.answer()
 
-        "options": json.dumps(
-            question["options"],
-            ensure_ascii=False
-        ),
+    user_id = query.from_user.id
 
-        "type": "quiz",
+    if query.data == "start_ssc":
+        questions = SSC_QUESTIONS
+        title = "SSC + RRB"
+    else:
+        questions = BANKING_QUESTIONS
+        title = "Banking"
 
-        # New Telegram Bot API format
-        "correct_option_ids": json.dumps(
-            [correct_option]
-        ),
+    session_id = str(uuid.uuid4())
 
-        # 60 second timer
-        "open_period": QUESTION_TIME,
-
-        # IMPORTANT:
-        # Keep False for name/score/rank tracking
-        "is_anonymous": False,
-
-        "allows_multiple_answers": False
+    sessions[user_id] = {
+        "session_id": session_id,
+        "questions": questions,
+        "title": title,
+        "current": 0,
+        "score": 0,
+        "answers": [],
+        "start_time": time.time()
     }
 
-    result = telegram("sendPoll", data)
-
-    if result and result.get("ok"):
-        poll_id = result["result"]["poll"]["id"]
-
-        print(
-            f"Poll sent successfully: "
-            f"{number}/{TOTAL_QUESTIONS}"
-        )
-
-        return poll_id
-
-    return None
+    await send_question(
+        query,
+        context,
+        user_id
+    )
 
 
-def collect_answers(end_time, poll_answers, scores):
-    global UPDATE_OFFSET
-
-    while time.time() < end_time:
-
-        remaining = end_time - time.time()
-
-        timeout = min(
-            5,
-            max(1, int(remaining))
-        )
-
-        params = {
-            "timeout": timeout,
-
-            # IMPORTANT:
-            # Explicitly request poll answers
-            "allowed_updates": json.dumps(
-                ["poll_answer"]
-            )
-        }
-
-        if UPDATE_OFFSET is not None:
-            params["offset"] = UPDATE_OFFSET
-
-        try:
-            response = requests.get(
-                f"{API_URL}/getUpdates",
-                params=params,
-                timeout=timeout + 10
-            )
-
-            result = response.json()
-
-            if not result.get("ok"):
-                print(
-                    "getUpdates Error:",
-                    result
-                )
-                continue
-
-            updates = result.get(
-                "result",
-                []
-            )
-
-            for update in updates:
-
-                UPDATE_OFFSET = (
-                    update["update_id"] + 1
-                )
-
-                answer = update.get(
-                    "poll_answer"
-                )
-
-                if not answer:
-                    continue
-
-                poll_id = answer.get(
-                    "poll_id"
-                )
-
-                # Ignore old/different polls
-                if poll_id not in poll_answers:
-                    continue
-
-                user = answer.get("user")
-
-                selected = answer.get(
-                    "option_ids",
-                    []
-                )
-
-                if not user:
-                    continue
-
-                user_id = user["id"]
-
-                if user_id not in scores:
-                    scores[user_id] = {
-                        "name": "",
-                        "correct": 0,
-                        "wrong": 0,
-                        "answered": set()
-                    }
-
-                username = user.get(
-                    "username"
-                )
-
-                first_name = user.get(
-                    "first_name",
-                    "User"
-                )
-
-                last_name = user.get(
-                    "last_name",
-                    ""
-                )
-
-                if username:
-                    name = f"@{username}"
-                else:
-                    name = (
-                        f"{first_name} "
-                        f"{last_name}"
-                    ).strip()
-
-                scores[user_id]["name"] = name
-
-                # Prevent duplicate scoring
-                if poll_id in scores[user_id]["answered"]:
-                    continue
-
-                # Empty option = vote removed
-                if not selected:
-                    continue
-
-                scores[user_id]["answered"].add(
-                    poll_id
-                )
-
-                if (
-                    selected[0]
-                    == poll_answers[poll_id]
-                ):
-                    scores[user_id]["correct"] += 1
-                else:
-                    scores[user_id]["wrong"] += 1
-
-                print(
-                    f"Answer received: "
-                    f"{name} | "
-                    f"{'Correct' if selected[0] == poll_answers[poll_id] else 'Wrong'}"
-                )
-
-        except Exception as e:
-            print(
-                "Answer collection error:",
-                e
-            )
-
-            time.sleep(1)
-
-
-def send_final_result(
-    chat_id,
-    scores,
-    title
+async def send_question(
+    query,
+    context,
+    user_id
 ):
-    if not scores:
 
-        telegram(
-            "sendMessage",
-            {
-                "chat_id": chat_id,
-                "text": (
-                    f"🏁 {title} Finished!\n\n"
-                    "No participants recorded."
-                )
-            }
-        )
+    session = sessions.get(user_id)
 
+    if not session:
         return
 
-    ranking = sorted(
-        scores.values(),
-        key=lambda x: x["correct"],
-        reverse=True
-    )
+    number = session["current"]
 
-    text = (
-        f"🏁 {title} Finished!\n\n"
-        f"📊 FINAL RESULT\n\n"
-    )
+    if number >= len(
+        session["questions"]
+    ):
+        await finish_exam(
+            query,
+            user_id
+        )
+        return
 
-    for rank, user in enumerate(
-        ranking[:20],
-        start=1
+    question = session[
+        "questions"
+    ][number]
+
+    keyboard = []
+
+    for i, option in enumerate(
+        question["options"]
     ):
 
-        answered = len(
-            user["answered"]
-        )
-
-        missed = (
-            TOTAL_QUESTIONS
-            - answered
-        )
-
-        text += (
-            f"🏆 {rank}. {user['name']}\n"
-            f"✅ Correct: {user['correct']}\n"
-            f"❌ Wrong: {user['wrong']}\n"
-            f"⏳ Missed: {missed}\n"
-            f"📊 Score: "
-            f"{user['correct']}/{TOTAL_QUESTIONS}\n\n"
-        )
-
-    telegram(
-        "sendMessage",
-        {
-            "chat_id": chat_id,
-            "text": text
-        }
-    )
-
-
-def run_quiz(
-    chat_id,
-    questions,
-    title
-):
-    print(
-        f"\n=============================="
-    )
-
-    print(
-        f"Starting {title}"
-    )
-
-    print(
-        f"=============================="
-    )
-
-    scores = {}
-    poll_answers = {}
-
-    for number, question in enumerate(
-        questions,
-        start=1
-    ):
-
-        print(
-            f"Sending question "
-            f"{number}/{TOTAL_QUESTIONS}"
-        )
-
-        poll_id = send_question(
-            chat_id,
-            number,
-            question
-        )
-
-        if poll_id is None:
-            print(
-                f"Question {number} failed."
+        keyboard.append([
+            InlineKeyboardButton(
+                option,
+                callback_data=f"answer_{i}"
             )
-            continue
+        ])
 
-        correct_option = (
-            get_correct_option(question)
+    keyboard.append([
+        InlineKeyboardButton(
+            "⏱ 60 Seconds",
+            callback_data="timer"
         )
+    ])
 
-        poll_answers[poll_id] = (
-            correct_option
+    await query.edit_message_text(
+        f"📝 {session['title']}\n\n"
+        f"Question {number + 1}/"
+        f"{TOTAL_QUESTIONS}\n\n"
+        f"{question['question']}\n\n"
+        f"⏱ Time: 60 seconds",
+        reply_markup=InlineKeyboardMarkup(
+            keyboard
         )
-
-        # Wait 60 seconds
-        end_time = (
-            time.time()
-            + QUESTION_TIME
-            + 2
-        )
-
-        collect_answers(
-            end_time,
-            poll_answers,
-            scores
-        )
-
-        # Small gap before next question
-        time.sleep(2)
-
-    send_final_result(
-        chat_id,
-        scores,
-        title
     )
 
-    print(
-        f"{title} completed."
+
+async def answer_question(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
+    query = update.callback_query
+
+    await query.answer()
+
+    user_id = query.from_user.id
+
+    session = sessions.get(user_id)
+
+    if not session:
+        await query.edit_message_text(
+            "❌ Exam session expired.\n\n"
+            "Send /start to begin again."
+        )
+        return
+
+    selected = int(
+        query.data.split("_")[1]
+    )
+
+    question = session[
+        "questions"
+    ][session["current"]]
+
+    correct = correct_answer(
+        question
+    )
+
+    if selected == correct:
+        session["score"] += 1
+
+    session["answers"].append(
+        selected
+    )
+
+    session["current"] += 1
+
+    await send_question(
+        query,
+        context,
+        user_id
+    )
+
+
+async def finish_exam(
+    query,
+    user_id
+):
+
+    session = sessions.get(user_id)
+
+    if not session:
+        return
+
+    score = session["score"]
+
+    total = len(
+        session["questions"]
+    )
+
+    percentage = (
+        score / total
+    ) * 100
+
+    await query.edit_message_text(
+        f"🏁 EXAM COMPLETED!\n\n"
+        f"📚 {session['title']}\n\n"
+        f"✅ Correct: {score}\n"
+        f"❌ Wrong: {total - score}\n"
+        f"📊 Score: {score}/{total}\n"
+        f"📈 Percentage: "
+        f"{percentage:.0f}%\n\n"
+        f"🎉 Thank you for attending!"
+    )
+
+    del sessions[user_id]
+
+
+async def timer_button(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
+    query = update.callback_query
+
+    await query.answer(
+        "⏱ Timer is 60 seconds.",
+        show_alert=True
     )
 
 
 def main():
 
-    print(
-        "🚀 DAILY QUIZ BOT STARTED"
+    app = (
+        Application
+        .builder()
+        .token(BOT_TOKEN)
+        .build()
+    )
+
+    app.add_handler(
+        CommandHandler(
+            "start",
+            start
+        )
+    )
+
+    app.add_handler(
+        CallbackQueryHandler(
+            start_exam,
+            pattern="^start_(ssc|banking)$"
+        )
+    )
+
+    app.add_handler(
+        CallbackQueryHandler(
+            answer_question,
+            pattern="^answer_[0-3]$"
+        )
+    )
+
+    app.add_handler(
+        CallbackQueryHandler(
+            timer_button,
+            pattern="^timer$"
+        )
     )
 
     print(
-        "SSC Chat ID:",
-        SSC_CHAT_ID
+        "🚀 Exam Bot Started"
     )
 
-    print(
-        "Banking Chat ID:",
-        BANKING_CHAT_ID
-    )
-
-    ssc_questions = load_questions(
-        SSC_FILE
-    )
-
-    banking_questions = load_questions(
-        BANKING_FILE
-    )
-
-    print(
-        f"SSC/RRB: "
-        f"{len(ssc_questions)} questions"
-    )
-
-    print(
-        f"Banking: "
-        f"{len(banking_questions)} questions"
-    )
-
-    # SSC + RRB
-    run_quiz(
-        SSC_CHAT_ID,
-        ssc_questions,
-        "SSC + RRB Quiz"
-    )
-
-    # Banking
-    run_quiz(
-        BANKING_CHAT_ID,
-        banking_questions,
-        "Banking Quiz"
-    )
-
-    print(
-        "✅ ALL QUIZZES COMPLETED"
+    app.run_polling(
+        allowed_updates=Update.ALL_TYPES
     )
 
 
