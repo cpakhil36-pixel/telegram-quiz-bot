@@ -1,0 +1,19 @@
+name: NEW AKHIL 
+Daily
+
+on:
+  workflow_dispatch:
+
+jobs:
+  quiz:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Quiz Bot
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+        run: python bot.py
