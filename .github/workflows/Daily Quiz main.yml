@@ -1,0 +1,29 @@
+name: Daily Quiz
+
+on:
+  schedule:
+    - cron: "30 2 * * *"
+  workflow_dispatch:
+
+jobs:
+  quiz:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install requests
+        run: pip install requests
+
+      - name: Run Quiz Bot
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          RRB_SSC_CHAT_ID: ${{ secrets.RRB_SSC_CHAT_ID }}
+          BANKING_CHAT_ID: ${{ secrets.BANKING_CHAT_ID }}
+        run: python bot.py
