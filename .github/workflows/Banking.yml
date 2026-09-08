@@ -42,7 +42,7 @@ jobs:
       - name: Send Rank List
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-          CHAT_ID: ${{ secrets.SSC_CHAT_ID }}
+         CHAT_ID: ${{ secrets.BANKING_CHAT_ID }}
         run: python rank_list.py
 
 
