@@ -1,0 +1,22 @@
+name: Banking Rank List
+
+on:
+  schedule:
+    # 10:15 AM IST - Rank List
+    - cron: "45 4 8 9 *"
+
+  workflow_dispatch:
+
+jobs:
+  rank-list:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Send Rank List
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.BANKING_CHAT_ID }}
+        run: python rank_list.py
