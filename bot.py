@@ -12,7 +12,7 @@ from zoneinfo import ZoneInfo
 # ==========================================
 
 TOKEN = os.environ["BOT_TOKEN"]
-CHAT_ID = os.environ["BANKING_CHAT_ID"]
+CHAT_ID = os.environ["CHAT_ID"]
 
 FILE_NAME = "SSC_sample_10_questions.csv"
 
