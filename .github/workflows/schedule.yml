@@ -1,19 +1,17 @@
-name: Akhil Quiz Schedule
+name: Schedule Test
 
 on:
- workflow_dispatch:
+  schedule:
+    - cron: "30 8 * * *"
+  workflow_dispatch:
 
 jobs:
-  send-quiz:
+  test:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout files
-        uses: actions/checkout@v4
-
-      - name: Send Quiz
-        env:
-          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-          CHAT_ID: ${{ secrets.CHAT_ID }}
-          FILE_NAME: SSC_sample_10_questions.csv
-        run: python bot.py
+      - name: Schedule Trigger Success
+        run: |
+          echo "✅ Schedule workflow triggered successfully"
+          echo "⏰ Test time: 2:00 PM IST"
+          date
