@@ -1,0 +1,17 @@
+name: Schedule Test
+
+on:
+  schedule:
+    - cron: "30 8 * * *"
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Schedule Trigger Success
+        run: |
+          echo "✅ Schedule workflow triggered successfully"
+          echo "⏰ Test time: 2:00 PM IST"
+          date
