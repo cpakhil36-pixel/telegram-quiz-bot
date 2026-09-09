@@ -1,4 +1,4 @@
-name: Schedule Test
+name: Daily Quiz
 
 on:
   schedule:
@@ -6,12 +6,24 @@ on:
   workflow_dispatch:
 
 jobs:
-  test:
+  quiz:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Schedule Trigger Success
-        run: |
-          echo "✅ Schedule workflow triggered successfully"
-          echo "⏰ Test time: 2:15 PM IST"
-          date
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Exam Bot
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          SSC_CHAT_ID: ${{ secrets.SSC_CHAT_ID }}
+          BANKING_CHAT_ID: ${{ secrets.BANKING_CHAT_ID }}
+        run: python bot.py
