@@ -2,7 +2,7 @@ name: Schedule Test
 
 on:
   schedule:
-    - cron: "30 8 * * *"
+    - cron: "45 8 * * *"
   workflow_dispatch:
 
 jobs:
@@ -13,5 +13,5 @@ jobs:
       - name: Schedule Trigger Success
         run: |
           echo "✅ Schedule workflow triggered successfully"
-          echo "⏰ Test time: 2:00 PM IST"
+          echo "⏰ Test time: 2:15 PM IST"
           date
